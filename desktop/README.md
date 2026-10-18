@@ -45,6 +45,10 @@ powershell -ExecutionPolicy Bypass -File 安装开机自启.ps1 install
 `Shell_TrayWnd` 下连 `ToolbarWindow32` 都没有，UIA 也读不到第三方图标）。
 所以这里不把托盘当作唯一入口，**胶囊和热键才是主路径**。
 
+**和极简任务管理器共存**：如果同时装了 [mini-tasker](https://github.com/CSCBDD392/mini-tasker)，
+两个收起的胶囊会互相避让——本程序在**右上角**，那个程序在**右侧中部**。
+主窗口也会互相避让：歌词条固定在顶部居中（宽 760），任务管理器从 y≥180 起。
+
 默认位置：屏幕顶部居中，760×148。没在播放超过 5 分钟会自动收成胶囊，一放歌就回来。
 
 ## 它是怎么知道"播到第几秒"的

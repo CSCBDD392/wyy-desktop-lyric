@@ -440,15 +440,102 @@ namespace WyyDesktopLyric
             }
         }
 
-        /// <summary>手动隐藏：缩小成右上角的小胶囊，点一下就能恢复。</summary>
+        /// <summary>
+        /// 缩小成小胶囊，点一下就能恢复。
+        ///
+        /// 位置策略：贴在屏幕右侧、顶部往下一点，但必须保证**不和其它程序的窗口重叠**。
+        /// 之前用「探测到占用就往下挪一格」的写法，遇到大窗口（比如居中的任务管理器）
+        /// 会一路挪到莫名其妙的地方，甚至挪出屏幕。现在改成：
+        ///   先用右上角，若被占，就贴着屏幕右侧往下找第一个空位；实在找不到就贴在任务栏上方。
+        /// </summary>
         private void EnterMiniMode()
         {
             _mini = true;
             var wa = Screen.PrimaryScreen.WorkingArea;
-            _bounds = new Rectangle(wa.X + wa.Width - MiniSize.Width - 12, wa.Y + 10, MiniSize.Width, MiniSize.Height);
-            _dragAreaHeight = MiniSize.Height;
+            int w = MiniSize.Width, h = MiniSize.Height;
+            int rightX = wa.Right - w - 12;
+
+            // 候选位置：从右上角开始，每隔一个胶囊高度往下探，最多 12 个
+            int top = wa.Top + 10;
+            int maxY = wa.Bottom - h - 10;
+            var chosen = new Rectangle(rightX, top, w, h);
+
+            bool free = IsSpotFree(chosen);
+            if (!free)
+            {
+                for (int y = top; y <= maxY; y += h + 8)
+                {
+                    var cand = new Rectangle(rightX, y, w, h);
+                    if (IsSpotFree(cand)) { chosen = cand; free = true; break; }
+                }
+            }
+            if (!free)
+            {
+                // 全都占着：退回右上角，至少位置是可预期的
+                chosen = new Rectangle(rightX, top, w, h);
+            }
+
+            _bounds = chosen;
+            _dragAreaHeight = h;
             Repaint(true);
         }
+
+        // ---------------------------------------------------------------- 占用探测
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr WindowFromPoint(POINT pt);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+
+
+        /// <summary>
+        /// 这个矩形是否「空」：在矩形里取几个采样点，看底下是不是自己的窗口或桌面。
+        /// 只看中心点是不够的——中心点可能落在别的窗口的空隙里，但边缘还是被压住。
+        /// </summary>
+        private bool IsSpotFree(Rectangle r)
+        {
+            // 四个角 + 中心，各内缩 4px 避开圆角
+            var pts = new[]
+            {
+                new POINT { X = r.Left + 4,  Y = r.Top + 4 },
+                new POINT { X = r.Right - 4, Y = r.Top + 4 },
+                new POINT { X = r.Left + 4,  Y = r.Bottom - 4 },
+                new POINT { X = r.Right - 4, Y = r.Bottom - 4 },
+                new POINT { X = r.Left + r.Width / 2, Y = r.Top + r.Height / 2 },
+            };
+
+            foreach (var pt in pts)
+            {
+                IntPtr h = WindowFromPoint(pt);
+                if (h == IntPtr.Zero) continue;
+                IntPtr root = GetAncestor(h, 2);   // GA_ROOT
+                if (root == IntPtr.Zero) continue;
+                if (root == Handle) continue;      // 自己的窗口，不算占
+
+                // 桌面/任务栏不算占（它们本来就是背景）
+                var cls = GetClassOf(root);
+                if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd" || cls == "Shell_SecondaryTrayWnd")
+                    continue;
+
+                return false;
+            }
+            return true;
+        }
+
+        private static string GetClassOf(IntPtr h)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder(128);
+                GetClassName(h, sb, sb.Capacity);
+                return sb.ToString();
+            }
+            catch { return ""; }
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
 
         /// <summary>画小胶囊：一个可点回来的入口。</summary>
         private void DrawMini(Graphics g, Rectangle rect)

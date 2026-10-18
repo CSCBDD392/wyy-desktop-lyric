@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>网易云歌词面板</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #16181d;
+      --bg2: #1e2128;
+      --fg: #eef1f6;
+      --dim: #98a0ad;
+      --accent: #ff4d4d;
+      --line: rgba(255, 255, 255, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      width: 300px;
+      margin: 0;
+      padding: 14px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    }
+    h1 {
+      margin: 0 0 2px;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    h1::before {
+      content: "";
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(255, 77, 77, 0.7);
+    }
+    .sub { color: var(--dim); font-size: 11px; margin-bottom: 10px; }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 0;
+      border-top: 1px solid var(--line);
+    }
+    .row:first-of-type { border-top: none; }
+    .section-title {
+      margin: 12px 0 2px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--dim);
+      letter-spacing: 0.6px;
+    }
+    .row label { color: var(--fg); }
+    .row .hint { color: var(--dim); font-size: 11px; }
+    input[type="number"] {
+      width: 84px;
+      background: var(--bg2);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 3px 6px;
+      font-size: 12px;
+    }
+    input[type="range"] { width: 118px; accent-color: var(--accent); }
+    input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
+    select {
+      background: var(--bg2);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 3px 6px;
+      font-size: 12px;
+    }
+    .status {
+      margin-top: 10px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      font-size: 11.5px;
+      color: var(--dim);
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 150px;
+      overflow: auto;
+    }
+    .status b { color: var(--fg); font-weight: 600; }
+    .status .ok { color: #59d38a; }
+    .status .bad { color: #ff7a7a; }
+    .actions { display: flex; gap: 8px; margin-top: 10px; }
+    button {
+      flex: 1;
+      padding: 7px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--bg2);
+      color: var(--fg);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    button:hover { background: #262a33; border-color: rgba(255, 255, 255, 0.2); }
+    button.primary { background: rgba(255, 77, 77, 0.18); border-color: rgba(255, 77, 77, 0.45); }
+    .foot { margin-top: 10px; color: var(--dim); font-size: 11px; line-height: 1.6; }
+    kbd {
+      background: #262a33; border: 1px solid var(--line); border-bottom-width: 2px;
+      border-radius: 4px; padding: 0 4px; font-size: 10.5px; font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <h1>网易云歌词面板</h1>
+  <div class="sub">music.163.com 网页版专用</div>
+
+  <div class="row">
+    <label for="enabled">启用面板</label>
+    <input type="checkbox" id="enabled" />
+  </div>
+  <div class="row">
+    <label for="compact">小窗模式<span class="hint"> 只显示当前一句</span></label>
+    <input type="checkbox" id="compact" />
+  </div>
+  <div class="row">
+    <label for="showTranslation">显示翻译</label>
+    <input type="checkbox" id="showTranslation" />
+  </div>
+  <div class="row">
+    <label for="showRoman">显示罗马音</label>
+    <input type="checkbox" id="showRoman" />
+  </div>
+  <div class="row">
+    <label for="seekOnClick">点歌词跳转播放</label>
+    <input type="checkbox" id="seekOnClick" />
+  </div>
+  <div class="row">
+    <label for="fontSize">字号 <span class="hint" id="fontSizeVal"></span></label>
+    <input type="range" id="fontSize" min="12" max="24" step="1" />
+  </div>
+  <div class="row">
+    <label for="opacity">不透明度 <span class="hint" id="opacityVal"></span></label>
+    <input type="range" id="opacity" min="40" max="100" step="1" />
+  </div>
+  <div class="row">
+    <label for="source">歌词来源</label>
+    <select id="source">
+      <option value="netease">网易云官方接口</option>
+      <option value="qq">QQ 音乐（备用）</option>
+    </select>
+  </div>
+
+  <div class="section-title">桌面歌词</div>
+  <div class="row">
+    <label for="desktop">推到桌面歌词条<span class="hint"> 浏览器最小化也能看</span></label>
+    <input type="checkbox" id="desktop" />
+  </div>
+  <div class="row">
+    <label for="desktopPort">本地服务端口</label>
+    <input type="number" id="desktopPort" min="1024" max="65535" step="1" />
+  </div>
+  <div class="row">
+    <label>服务状态</label>
+    <span class="hint" id="desktopState">未检测</span>
+  </div>
+
+  <div class="status" id="status">正在读取状态…</div>
+
+  <div class="actions">
+    <button id="test" class="primary">测试取词</button>
+    <button id="refresh">重新获取</button>
+  </div>
+  <div class="actions">
+    <button id="pingDesktop">检测桌面服务</button>
+  </div>
+
+  <div class="foot">
+    快捷键：<kbd>Alt</kbd>+<kbd>L</kbd> 显示/隐藏面板，<kbd>Alt</kbd>+<kbd>C</kbd> 切换小窗。<br />
+    面板可拖动，位置在当前标签页内保留。
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

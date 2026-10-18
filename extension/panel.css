@@ -1,0 +1,475 @@
+/**
+ * 网易云歌词面板 —— 全部样式。
+ * 类名统一 wyy- 前缀，避免和站点样式打架；随内容脚本注入到 #wyy-panel 下。
+ */
+
+#wyy-panel,
+.wyy-panel {
+  --wyy-font: 15px;
+  --wyy-a: 0.92;
+  --wyy-fg: #f3f5f8;
+  --wyy-fg-dim: rgba(240, 244, 250, 0.55);
+  --wyy-fg-faint: rgba(240, 244, 250, 0.32);
+  --wyy-accent: #ff4d4d;
+  --wyy-line: rgba(255, 255, 255, 0.09);
+  position: fixed;
+  top: 92px;
+  right: 16px;
+  z-index: 2147483000;
+  width: 320px;
+  max-height: min(62vh, 560px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  color: var(--wyy-fg);
+  background:
+    linear-gradient(180deg, rgba(22, 24, 30, calc(var(--wyy-a) + 0.04)) 0%, rgba(14, 16, 21, var(--wyy-a)) 100%);
+  border: 1px solid var(--wyy-line);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.42),
+    0 2px 8px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei",
+    "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+  font-size: var(--wyy-font);
+  line-height: 1.5;
+  text-align: left;
+  letter-spacing: 0.2px;
+  transition: opacity 0.18s ease, transform 0.18s ease, width 0.18s ease, max-height 0.18s ease;
+  contain: layout style;
+}
+
+#wyy-panel *,
+.wyy-panel * {
+  box-sizing: border-box;
+}
+
+/* 隐藏 / 加载态 */
+.wyy-panel.wyy-hidden {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  pointer-events: none;
+}
+
+.wyy-panel.wyy-dragging {
+  transition: none !important;
+  cursor: grabbing;
+}
+
+.wyy-grip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 5px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.wyy-panel:hover .wyy-grip {
+  opacity: 1;
+}
+
+.wyy-panel.wyy-compact .wyy-grip {
+  display: none;
+}
+
+/* 顶部进度条（加载中） */
+.wyy-panel.wyy-loading::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 40%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--wyy-accent), transparent);
+  animation: wyy-slide 1.1s ease-in-out infinite;
+  z-index: 3;
+}
+
+@keyframes wyy-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+
+/* ---------------------------------------------------------------- 头部 */
+.wyy-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 10px 9px 13px;
+  border-bottom: 1px solid var(--wyy-line);
+  cursor: grab;
+  user-select: none;
+  flex: 0 0 auto;
+}
+
+.wyy-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.wyy-title b {
+  font-size: 0.92em;
+  font-weight: 600;
+  color: var(--wyy-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wyy-title small {
+  font-size: 0.78em;
+  color: var(--wyy-fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.wyy-head-actions {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.wyy-icon {
+  all: unset;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--wyy-fg-dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.wyy-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.wyy-icon:active {
+  transform: scale(0.94);
+}
+
+/* ---------------------------------------------------------------- 歌词区 */
+.wyy-body {
+  position: relative;
+  flex: 1 1 auto;
+  /* 没有歌词时列表会被隐藏，这里兜一个最小高度，避免面板被压成一条 */
+  min-height: 180px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 30px, #000 calc(100% - 30px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 30px, #000 calc(100% - 30px), transparent 100%);
+}
+
+/* 歌词列表隐藏（空状态）时不需要渐隐遮罩，否则提示文字会被吃掉 */
+.wyy-body.wyy-list-hidden {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.wyy-list {
+  height: 100%;
+  padding: 8px 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  overscroll-behavior: contain;
+}
+
+.wyy-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.wyy-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+}
+
+.wyy-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.wyy-line {
+  padding: 5px 9px;
+  border-radius: 8px;
+  color: var(--wyy-fg-faint);
+  font-size: 1em;
+  transition: color 0.22s ease, background 0.22s ease, transform 0.22s ease, opacity 0.22s ease;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.wyy-line:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--wyy-fg-dim);
+}
+
+.wyy-line.wyy-credit {
+  font-size: 0.82em;
+  opacity: 0.6;
+}
+
+.wyy-line.wyy-active {
+  color: #fff;
+  background: linear-gradient(90deg, rgba(255, 77, 77, 0.16), rgba(255, 77, 77, 0.02));
+  box-shadow: inset 2px 0 0 var(--wyy-accent);
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.18);
+}
+
+.wyy-line.wyy-active .wyy-txt {
+  font-weight: 600;
+}
+
+.wyy-txt {
+  font-size: 1em;
+}
+
+.wyy-tr,
+.wyy-ro {
+  font-size: 0.82em;
+  color: var(--wyy-fg-dim);
+  margin-top: 1px;
+  line-height: 1.4;
+}
+
+.wyy-ro {
+  font-style: italic;
+  opacity: 0.86;
+}
+
+.wyy-line.wyy-active .wyy-tr,
+.wyy-line.wyy-active .wyy-ro {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* 空状态 */
+.wyy-empty {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 18px;
+  text-align: center;
+}
+
+.wyy-empty.wyy-show {
+  display: flex;
+}
+
+.wyy-empty-text {
+  color: var(--wyy-fg-dim);
+  font-size: 0.95em;
+}
+
+.wyy-retry {
+  all: unset;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--wyy-fg);
+  font-size: 0.82em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.wyy-retry:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+/* ---------------------------------------------------------------- 底部 */
+.wyy-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-top: 1px solid var(--wyy-line);
+  font-size: 0.76em;
+  color: var(--wyy-fg-faint);
+  min-height: 32px;
+}
+
+.wyy-chip {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 桌面歌词服务连不上时，底部这行变红提醒 */
+.wyy-chip.wyy-chip-bad {
+  color: #ff8f8f;
+}
+
+.wyy-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.wyy-btn {
+  all: unset;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--wyy-fg-faint);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wyy-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+.wyy-btn.wyy-on {
+  background: rgba(255, 77, 77, 0.22);
+  border-color: rgba(255, 77, 77, 0.5);
+  color: #ffd9d9;
+}
+
+.wyy-btn[disabled] {
+  opacity: 0.32;
+  cursor: default;
+  pointer-events: none;
+}
+
+.wyy-time {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* ---------------------------------------------------------------- 小窗模式 */
+.wyy-panel.wyy-compact {
+  top: auto;
+  right: 16px;
+  bottom: 96px;
+  width: 380px;
+  max-height: none;
+  border-radius: 12px;
+  /* 小窗是按内容撑高的：禁止 flex 子项沿主轴拉伸 */
+  align-content: flex-start;
+}
+
+.wyy-panel.wyy-compact .wyy-body {
+  flex: 0 0 auto;
+  min-height: 30px;
+  max-height: 96px;
+  -webkit-mask-image: none;
+  mask-image: none;
+  overflow: hidden;
+}
+
+.wyy-panel.wyy-compact .wyy-head {
+  padding: 7px 8px 7px 12px;
+  border-bottom: none;
+}
+
+.wyy-panel.wyy-compact .wyy-title b {
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--wyy-fg-dim);
+}
+
+.wyy-panel.wyy-compact .wyy-title small {
+  display: none;
+}
+
+.wyy-panel.wyy-compact .wyy-head-actions {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.wyy-panel.wyy-compact:hover .wyy-head-actions {
+  opacity: 1;
+}
+
+.wyy-panel.wyy-compact .wyy-list {
+  padding: 0 4px 8px;
+  overflow: hidden;
+}
+
+.wyy-panel.wyy-compact .wyy-line {
+  display: none;
+  padding: 2px 10px;
+  background: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.wyy-panel.wyy-compact .wyy-line.wyy-active {
+  display: block;
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.06em;
+}
+
+.wyy-panel.wyy-compact .wyy-line.wyy-active .wyy-tr,
+.wyy-panel.wyy-compact .wyy-line.wyy-active .wyy-ro {
+  color: var(--wyy-fg-dim);
+  font-size: 0.8em;
+}
+
+.wyy-panel.wyy-compact .wyy-foot {
+  display: none;
+}
+
+/* 暂停时略微降低存在感 */
+.wyy-panel.wyy-paused .wyy-line.wyy-active {
+  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.35);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent);
+}
+
+/* 收起底部导航类信息时（保持留白） */
+.wyy-panel.wyy-hide-nav .wyy-foot {
+  background: transparent;
+}
+
+/* 非常窄的窗口下自动收窄 */
+@media (max-width: 900px) {
+  .wyy-panel {
+    width: 270px;
+    max-height: min(52vh, 420px);
+  }
+
+  .wyy-panel.wyy-compact {
+    width: 300px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wyy-panel,
+  .wyy-line {
+    transition: none;
+  }
+}

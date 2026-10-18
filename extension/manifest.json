@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "网易云歌词面板",
+  "version": "1.0.0",
+  "description": "为 music.163.com 网页版播放器加上一个清爽的悬浮歌词面板：在线抓取歌词、跟随播放滚动、支持翻译与罗马音。",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "*://music.163.com/*",
+    "*://*.music.126.net/*",
+    "*://c.y.qq.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://music.163.com/*"],
+      "js": ["content.js"],
+      "css": ["panel.css"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://music.163.com/*"],
+      "js": ["main.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_title": "网易云歌词面板",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

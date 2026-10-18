@@ -5,8 +5,8 @@
 
 > **想要浏览器最小化后也能在桌面看歌词？**
 > 这个扩展还能把播放状态推给同目录外的 `wyy-desktop`（桌面歌词条）：
-> 弹窗里打开「推到桌面歌词条」即可，桌面端双击 `..\desktop\启动.cmd`。
-> 详见 `../desktop/README.md`。
+> 弹窗里打开「推到桌面歌词条」即可，桌面端双击 `..\wyy-desktop\启动.cmd`。
+> 详见 `..\wyy-desktop\README.md`。
 
 ```
 wyy-lyric/
@@ -26,7 +26,7 @@ Edge 155 / Chrome 111 以上都行，本机是 Edge。
 1. 地址栏输入 `edge://extensions/` 回车
 2. 打开左下角（或左侧栏）的 **开发人员模式**
 3. 点 **加载解压缩的扩展**，选中本文件夹：
-   `<本仓库>/extension`
+   `C:\Users\Administrator\Documents\deepseek-harness\default-workspace\wyy-lyric`
 4. 打开或刷新 `https://music.163.com`，右上角就会出现歌词面板
 
 > 不需要登录、不需要装油猴、不需要科学上网。装好后如果页面已经开着，按 F5 刷一下即可。

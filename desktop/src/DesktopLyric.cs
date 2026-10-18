@@ -566,17 +566,21 @@ namespace WyyDesktopLyric
             {
                 if (!_idleHidden)
                 {
+                    // 不要缩成 1x1——那样既看不见也点不到，只能靠热键或托盘。
+                    // 本机系统托盘根本不显示 NotifyIcon 图标，热键又可能被占用，
+                    // 所以这里同样缩成「♪ 显示歌词」胶囊，保证用户一定能找回来。
                     _idleHidden = true;
-                    using (var tiny = new Bitmap(1, 1))
-                        PushBitmap(tiny, new Point(_bounds.X, _bounds.Y));
-                    Program.Log("idle: 已自动收起歌词窗");
+                    EnterMiniMode();
+                    Program.Log("idle: 已自动收起为胶囊");
                 }
                 return;
             }
             if (_idleHidden)
             {
                 _idleHidden = false;
+                _mini = false;
                 force = true;              // 立刻重画回来，别等下一次歌词变化
+                LayoutWindow();
                 Program.Log("idle: 恢复显示");
             }
 
@@ -1001,8 +1005,17 @@ namespace WyyDesktopLyric
         {
             if (_mini)
             {
-                if (e.Button == MouseButtons.Right) ShowMenu();
-                else ToggleVisible();          // 点小胶囊直接展开
+                if (e.Button == MouseButtons.Right) { ShowMenu(); return; }
+                // 点胶囊 = 展开。
+                // 注意不能直接调 ToggleVisible：空闲自动收起时 _visible 已经是 true，
+                // 再 toggle 一次会变成 false，反而更看不见。这里显式展开并给一个豁免期。
+                _mini = false;
+                _visible = true;
+                _idleHidden = false;
+                _manualShowUntil = DateTime.Now.AddMinutes(5);
+                ApplyExStyles();
+                LayoutWindow();
+                Repaint(true);
                 return;
             }
             if (e.Button == MouseButtons.Right)

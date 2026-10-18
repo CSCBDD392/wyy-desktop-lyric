@@ -11,15 +11,13 @@ set "HERE=%~dp0"
 set "LOGDIR=%HERE%logs"
 if not exist "%LOGDIR%" mkdir "%LOGDIR%" >nul 2>nul
 
-rem ---------- locate node (bundled runtime first: it is known to work) ----------
+rem ---------- locate node ----------
 set "NODE="
-set "BUNDLED=%HERE%..\..\..\..\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe"
-if exist "!BUNDLED!" set "NODE=!BUNDLED!"
+for /f "delims=" %%i in ('where node 2^>nul') do if not defined NODE set "NODE=%%i"
 if not defined NODE (
-  for /f "delims=" %%i in ('where node 2^>nul') do if not defined NODE set "NODE=%%i"
-)
-if not defined NODE (
-  echo [x] node.exe not found. Install Node.js, or run: node "%HERE%server.js"
+  echo [x] node.exe not found.
+  echo     Install Node.js from https://nodejs.org/ and run this again.
+  echo     Or launch the server manually:  node "%HERE%server.js"
   pause
   exit /b 1
 )

@@ -591,11 +591,16 @@ namespace WyyDesktopLyric
                                     " rawKeys=" + string.Join(",", new List<string>(dict.Keys).ToArray()));
                     BeginInvoke((Action)(() =>
                     {
+                        bool recovered = !_backendAlive;
+                        _backendAlive = true;
+                        _backendDownSince = DateTime.MinValue;
+                        _backendRestartTries = 0;
                         _snap = snap;
                         _lines = lines;
                         _baseElapsed = snap.Elapsed;
                         _syncTick = _clock.Elapsed.TotalSeconds;
                         _activeIndex = -1;
+                        if (recovered) Program.Log("backend: 已恢复");
                         Repaint(true);
                     }));
                 }
@@ -604,15 +609,105 @@ namespace WyyDesktopLyric
                     Program.Log("poll FAILED: " + ex.Message);
                     BeginInvoke((Action)(() =>
                     {
+                        // 后端连不上：标记出来，让界面明确显示「服务已停止」而不是含糊的「未连接」
+                        if (_backendAlive)
+                        {
+                            _backendAlive = false;
+                            _backendDownSince = DateTime.Now;
+                            Program.Log("backend: 失联 " + ex.Message);
+                        }
+
                         if (!_snap.Connected)
                         {
                             _snap.Status = "offline";
                             Repaint(true);
                         }
+
+                        TryRestartBackend();
                     }));
                 }
                 finally { _busy = false; }
             });
+        }
+
+        // ---------------------------------------------------------------- 后端自愈
+        private bool _backendAlive = true;
+        private DateTime _backendDownSince = DateTime.MinValue;
+        private int _backendRestartTries;
+        private DateTime _lastRestartAttempt = DateTime.MinValue;
+
+        /// <summary>
+        /// 后端（server.js）挂了之后尝试拉起来。
+        ///
+        /// 之前歌词窗只会一直重试 HTTP，后端死了也看不出来——表现就是「前端图标还在，但什么都不显示」。
+        /// 现在：
+        ///   · 连续失败 10 秒后开始尝试重启
+        ///   · 每次重启间隔至少 30 秒，最多试 5 次
+        ///   · 优先用系统 node；找不到就放弃，提示用户手动跑 启动.cmd
+        /// </summary>
+        private void TryRestartBackend()
+        {
+            if (_backendAlive) return;
+            if ((DateTime.Now - _backendDownSince).TotalSeconds < 10) return;
+            if (_backendRestartTries >= 5) return;
+            if ((DateTime.Now - _lastRestartAttempt).TotalSeconds < 30) return;
+
+            _lastRestartAttempt = DateTime.Now;
+            _backendRestartTries++;
+            Program.Log("backend: 尝试重启 #" + _backendRestartTries);
+
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    string exe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "server.js");
+                    if (!File.Exists(exe)) { Program.Log("backend: 找不到 server.js"); return; }
+
+                    string node = FindNode();
+                    if (node == null) { Program.Log("backend: 找不到 node.exe"); return; }
+
+                    var psi = new ProcessStartInfo(node, "\"" + exe + "\"")
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
+                        RedirectStandardOutput = false,
+                        RedirectStandardError = false,
+                    };
+                    var p = Process.Start(psi);
+                    Program.Log("backend: 已拉起 pid=" + (p == null ? 0 : p.Id));
+                }
+                catch (Exception ex)
+                {
+                    Program.Log("backend: 重启失败 " + ex.Message);
+                }
+            });
+        }
+
+        /// <summary>找系统中的 node.exe：先看 PATH，再看常见安装位置。</summary>
+        private static string FindNode()
+        {
+            string pathVar = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (var dir in pathVar.Split(';'))
+            {
+                if (string.IsNullOrWhiteSpace(dir)) continue;
+                try
+                {
+                    string candidate = Path.Combine(dir.Trim(), "node.exe");
+                    if (File.Exists(candidate)) return candidate;
+                }
+                catch (Exception) { }
+            }
+
+            foreach (var guess in new[]
+            {
+                @"C:\Program Files\nodejs\node.exe",
+                @"C:\Program Files (x86)\nodejs\node.exe",
+            })
+            {
+                if (File.Exists(guess)) return guess;
+            }
+            return null;
         }
 
         private double CurrentElapsed()
@@ -852,28 +947,48 @@ namespace WyyDesktopLyric
         }
 
         /// <summary>
-        /// 网页版没在上报时画这个：明确说清是「没连上」，位置和时间都不显示。
-        /// 绝不拿最后一条旧数据假装还在播——那正是「歌词和实际播放差几分钟」的根源。
+        /// 没连上时画这个。要说清楚是哪一层断了：
+        ///   · 后端服务（server.js）挂了 —— 这才是真正的故障，必须明确写出来
+        ///   · 服务在、但没有任何上报 —— 播放器没在放歌，或浏览器没开
+        /// 以前两种情况都只显示「网页版未连接」，导致后端崩了也看不出来。
         /// </summary>
         private void DrawDisconnected(Graphics g, Rectangle rect)
         {
             int padX = 20;
             int metaY = 12;
 
-            using (var db = new SolidBrush(DotIdle))
+            // 后端服务本身连不上 = 严重故障
+            bool backendDown = !_backendAlive;
+
+            using (var db = new SolidBrush(backendDown ? DotPaused : DotIdle))
                 g.FillEllipse(db, padX, metaY + 5, 7, 7);
 
             using (var fMeta = new Font("Microsoft YaHei UI", 9.5f, FontStyle.Bold, GraphicsUnit.Point))
             using (var fMain = new Font("Microsoft YaHei UI", _compact ? 16f : 19f, FontStyle.Regular, GraphicsUnit.Pixel))
             using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
             {
-                using (var mb = new SolidBrush(TextDim))
-                    g.DrawString("网页版未连接", fMeta, mb, padX + 14, metaY);
-                using (var hb = new SolidBrush(Color.FromArgb(110, 240, 244, 250)))
-                    g.DrawString("歌词窗只显示，不播放", fMeta, hb, rect.Width - 170, metaY);
+                string head = backendDown ? "歌词服务已停止" : "网页版未连接";
+                using (var mb = new SolidBrush(backendDown ? DotPaused : TextDim))
+                    g.DrawString(head, fMeta, mb, padX + 14, metaY);
 
-                using (var tb = new SolidBrush(TextDim))
-                    g.DrawString("在 music.163.com 播放歌曲后自动显示歌词", fMain, tb,
+                using (var hb = new SolidBrush(Color.FromArgb(110, 240, 244, 250)))
+                    g.DrawString(backendDown ? "正在自动重启…" : "歌词窗只显示，不播放", fMeta, hb, rect.Width - 180, metaY);
+
+                string main;
+                if (backendDown)
+                {
+                    // 明确告诉用户"这不是我在放歌的问题"，并给出自救动作
+                    main = _backendRestartTries > 0
+                        ? "后端已停止，正在重试启动（第 " + _backendRestartTries + " 次）· 也可以双击 启动.cmd"
+                        : "后端已停止 · 双击 启动.cmd 重新启动";
+                }
+                else
+                {
+                    main = "在 music.163.com 播放歌曲后自动显示歌词";
+                }
+
+                using (var tb = new SolidBrush(backendDown ? Color.FromArgb(230, 240, 244, 250) : TextDim))
+                    g.DrawString(main, fMain, tb,
                         new RectangleF(padX, 34, rect.Width - padX * 2, rect.Height - 46), sf);
             }
         }

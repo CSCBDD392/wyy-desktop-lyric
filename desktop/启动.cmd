@@ -46,12 +46,11 @@ if "!HEALTH!"=="200" (
 )
 
 rem ---------- start the SMTC bridge (reads Windows media session; no browser extension needed) ----------
+rem 不用 bridge.pid 判断：桥接把该文件以「独占」方式打开当作实例锁，
+rem 所以从别的进程读它会得到 "file is being used by another process"，type 拿不到内容。
+rem 改为直接扫进程名，谁在跑一目了然。
 set "BRIDGE_ALIVE="
-if exist "%HERE%logs\bridge.pid" (
-  for /f "delims=" %%p in ('type "%HERE%logs\bridge.pid"') do (
-    for /f "delims=" %%q in ('powershell -NoProfile -Command "if (Get-Process -Id %%p -ErrorAction SilentlyContinue) { 'yes' }"') do set "BRIDGE_ALIVE=%%q"
-  )
-)
+for /f "delims=" %%q in ('powershell -NoProfile -Command "if (Get-CimInstance Win32_Process -Filter \"Name=''powershell.exe''\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like ''*smtc-bridge.ps1*'' }) { ''yes'' }" 2^>nul') do set "BRIDGE_ALIVE=%%q"
 if "%BRIDGE_ALIVE%"=="yes" (
   echo [i] media-session bridge already running
 ) else (

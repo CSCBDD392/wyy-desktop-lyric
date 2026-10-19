@@ -22,13 +22,49 @@ param(
 $ErrorActionPreference = 'Stop'
 $endpoint = "http://127.0.0.1:$Port/api/report"
 
-# 记下自己的 PID，供启动脚本判断是否已经在跑
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$pidFile = Join-Path $here 'logs\bridge.pid'
+$lockDir = Join-Path $here 'logs'
+if (-not (Test-Path $lockDir)) { New-Item -ItemType Directory -Force -Path $lockDir | Out-Null }
+
+# ---------------------------------------------------------------- 单实例保护
+# 多个桥接同时读 Windows 媒体会话（WinRT）会在 ntdll 里进程级崩溃
+# （0xc0000005，脚本 try/catch 拦不住），所以必须从源头禁止多开。
+#
+# 试过三种方案，只有文件独占锁可靠：
+#   1. 命名互斥体  —— PowerShell 5.1 里 [ref] 取 createdNew 会静默失败
+#   2. 扫进程列表  —— 并发启动时两个进程都还没出现在列表里，谁都拦不住
+#   3. 文件独占锁  —— 由操作系统保证同一时刻只有一个能打开（当前方案）
+$pidFile = Join-Path $lockDir 'bridge.pid'
+
+# 拿锁：以独占方式打开 pid 文件，打开成功 = 拿到了单实例权。
+# 注意：这个句柄必须一直开着直到进程退出，锁才会一直有效。
+$lockOk = $false
+$lockStream = $null
 try {
-  $logDir = Split-Path -Parent $pidFile
-  if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
-  Set-Content -Path $pidFile -Value $PID -Encoding ASCII
+  $lockStream = [System.IO.File]::Open($pidFile, [System.IO.FileMode]::OpenOrCreate,
+    [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+  $lockOk = $true
+} catch {
+  $lockOk = $false
+}
+
+if (-not $lockOk) {
+  # 必须用 exit 而不是 return：
+  # return 只退出当前作用域，powershell.exe 进程本身还留在那里，
+  # 于是「被挡住的实例」看上去还活着 —— 启动脚本会误以为桥接在跑，
+  # 实际上它什么也不做，而真正的桥接可能早就崩了。只有 exit 能干净地结束进程。
+  exit 0
+}
+
+# 把自己的 pid 写进文件，供 启动.cmd 判断。
+# 关键：用 StreamWriter 时必须 leaveOpen=true，否则 Dispose 会连带关闭
+# 底层 FileStream → 锁被释放 → 单实例失效（这个坑踩过）。
+try {
+  $lockStream.SetLength(0)
+  $writer = New-Object System.IO.StreamWriter($lockStream, [System.Text.Encoding]::ASCII, 1024, $true)
+  $writer.Write("$PID")
+  $writer.Flush()
+  $writer.Dispose()
 } catch { }
 
 Add-Type -AssemblyName System.Runtime.WindowsRuntime

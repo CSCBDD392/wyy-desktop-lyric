@@ -477,7 +477,29 @@ const server = http.createServer((req, res) => {
   res.writeHead(404); res.end('not found');
 });
 
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    // 端口被占用通常意味着已经有一份在跑了——不是错误，直接退出即可
+    console.error(`[wyy-desktop] 端口 ${PORT} 已被占用，说明服务很可能已经在运行。本次退出。`);
+    process.exit(0);
+  }
+  console.error('[wyy-desktop] 服务启动失败:', err && err.message);
+  process.exit(1);
+});
+
 server.listen(PORT, HOST, () => {
   console.log(`[wyy-desktop] 歌词服务已启动: http://${HOST}:${PORT}/`);
   console.log(`[wyy-desktop] 歌词窗页面:     http://${HOST}:${PORT}/overlay`);
+});
+
+// 把未捕获异常写进日志，而不是让进程静默消失
+process.on('uncaughtException', (err) => {
+  try {
+    console.error('[wyy-desktop] 未捕获异常:', (err && err.stack) || err);
+  } catch (e) { /* ignore */ }
+});
+process.on('unhandledRejection', (err) => {
+  try {
+    console.error('[wyy-desktop] 未处理的 Promise 拒绝:', (err && err.stack) || err);
+  } catch (e) { /* ignore */ }
 });
